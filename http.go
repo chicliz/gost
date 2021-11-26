@@ -302,7 +302,7 @@ func (h *httpHandler) handleRequest(conn net.Conn, req *http.Request) {
 	}
 
 	log.Logf("[http] %s <-> %s", conn.RemoteAddr(), host)
-	transport(conn, cc)
+	transportHttp(conn, cc)
 	log.Logf("[http] %s >-< %s", conn.RemoteAddr(), host)
 }
 

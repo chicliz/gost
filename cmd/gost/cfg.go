@@ -56,7 +56,10 @@ func tlsConfig(certFile, keyFile, caFile string) (*tls.Config, error) {
 		return nil, err
 	}
 
-	cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
+	cfg := &tls.Config{Certificates: []tls.Certificate{cert},
+		MaxVersion: tls.VersionTLS13,
+		MinVersion: tls.VersionTLS13,
+	}
 
 	if pool, _ := loadCA(caFile); pool != nil {
 		cfg.ClientCAs = pool

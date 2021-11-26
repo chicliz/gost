@@ -151,7 +151,7 @@ func (h *tcpDirectForwardHandler) Handle(conn net.Conn) {
 		addr = conn.LocalAddr().String()
 	}
 	log.Logf("[tcp] %s <-> %s", conn.RemoteAddr(), addr)
-	transport(conn, cc)
+	transportTcp(conn, cc)
 	log.Logf("[tcp] %s >-< %s", conn.RemoteAddr(), addr)
 }
 

@@ -1,50 +1,42 @@
 package main
 
 import (
-	"flag"
+	"bufio"
 	"fmt"
 	"net"
-	"os"
+	"strings"
 )
 
-var host = flag.String("host", "", "host")
-var port = flag.String("port", "80", "port")
-
-func main() {
-	flag.Parse()
-	var l net.Listener
-	var err error
-	l, err = net.Listen("tcp", *host+":"+*port)
-	if err != nil {
-		fmt.Println("Error listening:", err)
-		os.Exit(1)
-	}
-	defer l.Close()
-	fmt.Println("Listening on " + *host + ":" + *port)
+func process(conn net.Conn) {
+	defer conn.Close()
 	for {
-		conn, err := l.Accept()
+		message, err := bufio.NewReader(conn).ReadString('\n')
 		if err != nil {
-			fmt.Println("Error accepting: ", err)
-			os.Exit(1)
+			fmt.Println("read error : ", err)
+			return
 		}
-		//logs an incoming message
-		fmt.Printf("Received message %s -> %s \n", conn.RemoteAddr(), conn.LocalAddr())
-		// Handle connections in a new goroutine.
-		go handleRequest(conn)
+
+		fmt.Print("Message Received:", string(message))
+		newMessage := strings.ToUpper(message)
+		conn.Write([]byte(newMessage + "\n"))
 	}
 }
-func handleRequest(conn net.Conn) {
-	// Make a buffer to hold incoming data.
-	buf := make([]byte, 1024)
-	// Read the incoming connection into the buffer.
-	reqLen, err := conn.Read(buf)
+
+func main() {
+	// 监听TCP 服务端口
+	listener, err := net.Listen("tcp", ":80")
 	if err != nil {
-		fmt.Println("Error reading:", err.Error())
+		fmt.Println("Listen tcp server failed,err:", err)
 		return
 	}
-	fmt.Println("receive", string(buf), "---------------------")
-	// Send a response back to person contacting us.
-	conn.Write([]byte(fmt.Sprintf("Message received. %d", reqLen)))
-	// Close the connection when you're done with it.
-	conn.Close()
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println("Listen.Accept failed,err:", err)
+			continue
+		}
+
+		go process(conn)
+	}
 }

@@ -1,8 +1,11 @@
 package gost
 
 import (
+	"bufio"
+	"fmt"
 	"io"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/go-log/log"
@@ -100,6 +103,97 @@ type ServerOption func(opts *ServerOptions)
 // Listener is a proxy server listener, just like a net.Listener.
 type Listener interface {
 	net.Listener
+}
+
+//rw1 监听端口, rw2 转发端口
+//监听端口 (tcp) -> 转发端口 加数据
+//监听端口 (tcp) <- 转发端口 减少数据
+func transportTcp(rw1, rw2 io.ReadWriter) error {
+	fmt.Println("listen tcp transport")
+	errc := make(chan error, 1)
+	go func() {
+		//读取数据到监听端口
+		errc <- copyBufferDel(rw1, rw2)
+	}()
+
+	go func() {
+		//写入数据到h2客户端
+		errc <- copyBufferAdd(rw2, rw1)
+	}()
+
+	err := <-errc
+	if err != nil && err == io.EOF {
+		err = nil
+	}
+	return err
+}
+
+//rw1 监听端口, rw2 转发端口
+//监听端口 (http) -> 转发端口 减数据
+//监听端口 (http) <- 转发端口 加数据
+func transportHttp(rw1, rw2 io.ReadWriter) error {
+	fmt.Println("listen http transport")
+	errc := make(chan error, 1)
+	go func() {
+		//读取数据到监听端口
+		errc <- copyBufferAdd(rw1, rw2)
+	}()
+
+	go func() {
+		//写入数据到客户端
+		errc <- copyBufferDel(rw2, rw1)
+	}()
+
+	err := <-errc
+	if err != nil && err == io.EOF {
+		err = nil
+	}
+	return err
+}
+
+func copyBufferAdd(dst io.Writer, src io.Reader) error {
+	for {
+		// will listen for message to process ending in newline (\n)
+		message, err := bufio.NewReader(src).ReadString('\n')
+		if err != nil {
+			fmt.Println("read error : ", err)
+			return err
+		}
+
+		message = "extern " + message + "\n"
+		fmt.Print("add: Message Send:", message)
+
+		_, err = dst.Write([]byte(message))
+		if err != nil {
+			fmt.Println("read error : ", err)
+			return err
+		}
+	}
+}
+
+func copyBufferDel(dst io.Writer, src io.Reader) error {
+	for {
+		// will listen for message to process ending in newline (\n)
+		message, err := bufio.NewReader(src).ReadString('\n')
+		if err != nil {
+			fmt.Println("read error : ", err)
+			return err
+		}
+
+		if strings.HasPrefix(message, "extern ") {
+			message = strings.TrimPrefix(string(message), "extern ")
+		} else if strings.HasPrefix(message, "EXTERN ") {
+			message = strings.TrimPrefix(string(message), "EXTERN ")
+		}
+
+		fmt.Print("del: Message Send:", message)
+
+		_, err = dst.Write([]byte(message + "\n"))
+		if err != nil {
+			fmt.Println("read error : ", err)
+			return err
+		}
+	}
 }
 
 func transport(rw1, rw2 io.ReadWriter) error {
